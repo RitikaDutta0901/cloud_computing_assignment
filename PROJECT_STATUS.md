@@ -60,6 +60,14 @@ environment.
 - Generated `report/report.pdf` from the report source with LibreOffice; it
   preserves the report's explicit distinction between measured local evidence
   and unmeasured cluster-dependent results.
+- Bootstrapped the checked-in CPU virtual environment with `make install-ml`.
+- Ran `make verify`: Ruff clean, **49 tests passed**, and NACL sample **6/6**.
+- Ran `make train SUBSET=50` and `make train-v2 SUBSET=50` against the
+  existing local smoke dataset. Both completed and uploaded local smoke model
+  artefacts to `local-storage/models/v1` and `local-storage/models/v2`;
+  v1 used 36 records for two epochs (final loss 0.572483), and v2 used 36
+  records for three epochs (final loss 0.245359). These are smoke results, not
+  the required full 1,500-record training run.
 
 ## Live labeling diagnosis (2026-11-06)
 
