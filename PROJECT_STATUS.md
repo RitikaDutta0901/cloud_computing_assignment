@@ -96,3 +96,18 @@ run `python worker/clean.py` against the full 3,000-command output, and only
 then start the 1,500-record student training run. Docker, k3d, kubectl, and a
 Git checkout remain external prerequisites for the unmeasured deployment and
 CI evidence.
+
+## Additional execution evidence (2026-11-06 22:27)
+
+- Local FastAPI service was started with the trained v1 smoke model and passed
+  `/healthz`, `/readyz`, and a real `/parse` request with the required headers.
+- `scripts/bench_local.py` sent 50 sequential requests: p50 **453.19 ms**,
+  p95 **1,071.05 ms**, throughput **1.991 requests/s**, peak RSS **473.7 MiB**,
+  and **6 HTTP 500 invalid-model-output responses (12.0% error rate)**. The
+  error rate is a measured limitation of the 36-record smoke model, not a
+  claimed assignment pass.
+- All Kubernetes YAML files parsed successfully with PyYAML: **8 files / 15
+  documents**. Docker, k3d, and kubectl remain unavailable for API-server and
+  cluster execution.
+- Local model tarball checksums: v1 `e0f9f649f80e7f6ce9e46236258ee67ff2ec723fe8bca89cfa0ea7ca98f4724d`;
+  v2 `912eb29b0b849627966ef5c5a8f7d0aa2c7cf92a1bd9aaaa1cbd09a6635b16d8`.
