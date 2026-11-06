@@ -1,0 +1,16 @@
+.git
+.github
+.venv
+models
+local-storage
+results
+report
+tests
+data
+docs
+*.tar.gz
+*.safetensors
+*.bin
+__pycache__
+.pytest_cache
+.ruff_cache
