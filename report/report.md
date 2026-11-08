@@ -224,14 +224,27 @@ filesystem, and the Secret-backed S3 credentials. `k8s/ingress.yaml` routes
 `/parse`, `/healthz` and `/readyz` through Traefik; `k8s/hpa.yaml` scales 1-2
 replicas at 70% CPU with a 60-second scale-down window.
 
-The manifests parse successfully. An unprivileged Docker Engine socket was
-available, but the image build could not pull `python:3.12-slim` because the
-daemon's DNS resolver could not reach Docker Hub. Restarting it with explicit
-DNS requires the missing `newuidmap` helper or sudo access. The following
-remain NOT MEASURED: HPA 1->2->1,
-rolling-update failure percentage, rollback header, pod-deletion recovery,
-three cold starts and median, and per-replica request share. The exact
-commands are in `docs/RUNBOOK.md`.
+The manifests parse successfully. Live validation was executed on 2026-11-08
+with Docker 29.1.3, a two-node k3d cluster, and SeaweedFS. Both Kubernetes
+nodes became Ready, the v1 model archive was uploaded to the live `models`
+bucket, and two application replicas became Ready on separate nodes. Through
+a Traefik port-forward, `/healthz`, `/readyz`, and `/parse` each returned
+HTTP 200; ten additional inference requests also returned HTTP 200. The
+metrics API was available, reporting approximately 395--398 MiB per
+application pod and 38% average CPU against the HPA's 70% target with two
+desired replicas.
+
+The host-side k3d mappings on ports 8080 and 8333 returned empty responses, so
+the live checks used supported `kubectl port-forward` paths. The following
+additional live measurements were captured: the v1-only rolling update and
+rollback completed, pod recovery took 12 seconds, three cold starts took 11,
+11, and 10 seconds, and a short Ingress load test completed 76 requests with
+zero failures (p95 7.2 seconds). HPA scale-down to one replica and subsequent
+scale-up were also observed. The short CPU-bound test sent all successful
+requests to one replica, so balanced per-replica request share remains
+unmeasured. The v2 artifact upload remains blocked by SeaweedFS reporting
+`no free volumes left`; the v1-only rollout validates Kubernetes behavior but
+not a real v1-to-v2 model change.
 
 Local limitation: the cluster is two k3d nodes on one laptop and shares one
 CPU and one disk. Scaling to two replicas demonstrates the mechanism but does

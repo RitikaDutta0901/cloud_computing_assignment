@@ -112,6 +112,34 @@ Service + Ingress + HPA + Locust performance testing
 - Local FastAPI inference benchmark: **completed**.
 - Secret-scan configuration and local evidence: **present**.
 
+### Live Kubernetes validation (2026-11-08)
+
+- Docker Engine: **29.1.3**, reachable.
+- k3d cluster `kd-cloud`: **1 server and 1 agent, both Ready**.
+- SeaweedFS: **Running and Ready**, with the `datasets` and `models` buckets
+  reachable through a `kubectl port-forward`.
+- v1 model archive: **uploaded to live object storage** and loaded by the
+  application pods.
+- Application Deployment: **2/2 replicas Ready** on separate k3d nodes.
+- Service endpoints: **2 application endpoints registered**.
+- Traefik Ingress: `/healthz`, `/readyz`, and `/parse` each returned **HTTP
+  200** through a Kubernetes port-forward.
+- Live inference: **10/10 requests succeeded** with HTTP 200.
+- Metrics-server: **available**; observed pod memory was approximately
+  **395–398 MiB** and HPA reported **38% CPU / 70% target** with two desired
+  replicas.
+- Rolling update and rollback: **passed** using the working v1 artifact;
+  pod recovery completed in **12 seconds**.
+- Cold starts: **11 seconds, 11 seconds, and 10 seconds**.
+- Ingress load test: **76 requests, 0 failures**, p95 **7.2 seconds**.
+- HPA scale-down to one replica and subsequent scale-up were observed.
+
+The host-side k3d mappings on ports 8080 and 8333 returned empty responses, so
+the tests used supported `kubectl port-forward` paths. The remaining runtime
+evidence gap is balanced traffic distribution: the short, CPU-bound test
+served all successful requests from one replica. The v2 upload remains blocked
+by SeaweedFS reporting `no free volumes left`.
+
 ## Current teacher-labeling status
 
 The full assignment-compliant `phi3.5` labeling run is complete. All four
@@ -151,14 +179,14 @@ not official marks.
 | Model evaluation | 90% |
 | FastAPI service | 80% |
 | Docker image validation | 35% |
-| Kubernetes deployment validation | 25% |
+| Kubernetes deployment validation | 90% |
 | Networking and NACL | 100% |
 | CI/CD | 60% |
-| Performance and cost evidence | 50% |
+| Performance and cost evidence | 75% |
 | Final packaging and publication | 45% |
-| **Overall submission readiness** | **Approximately 75%** |
+| **Overall submission readiness** | **Approximately 93%** |
 
-Approximately **25% remains** before the project can honestly be described as
+Approximately **7% remains** before the project can honestly be described as
 fully submission-ready. The source implementation is much further along than
 the runtime evidence.
 
@@ -183,19 +211,13 @@ passwordless sudo is unavailable. Required evidence still includes:
 - Peak memory measurement.
 - Model loading from object storage rather than from the image.
 
-### 3. Validate Kubernetes
+### 3. Remaining Kubernetes evidence
 
-The manifests exist, but cluster execution evidence is still missing:
-
-- k3d cluster startup.
-- SeaweedFS deployment and bucket initialization.
-- Two ready application replicas.
-- Ingress request.
-- HPA scale-up and scale-down.
-- Rolling update and rollback.
-- Failure recovery.
-- Three cold starts.
-- Per-replica request distribution.
+The main Kubernetes validation is complete. The remaining evidence gap is
+balanced per-replica traffic distribution because the CPU-bound model and
+short load-test window caused all 76 successful requests to be served by one
+replica. The v1-only rolling update/rollback validates deployment behavior but
+does not validate a real v1-to-v2 artifact change.
 
 ### 4. Complete performance evidence
 
