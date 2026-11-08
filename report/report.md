@@ -299,9 +299,12 @@ checksum, runs `training/predict.py`, then `tools/score.py`) -> `quality-gate`
 through the same gate and is expected to fail; its URL must be inserted here
 after the repository is pushed:
 
-No failing quality-gate URL is available yet because the workflow has not
-completed against a published Release asset. The workflow is configured with
-`workflow_dispatch` input `bad_model=true` for this demonstration.
+The successful CI run is
+`https://github.com/RitikaDutta0901/cloud_computing_assignment/actions/runs/42474820456`.
+The expected-failure quality-gate demonstration is
+`https://github.com/RitikaDutta0901/cloud_computing_assignment/actions/runs/42474973794`;
+the quality-gate demo job failed as intended while lint, tests, model
+evaluation, and the normal quality gate passed.
 
 `AI_USE.md` lists the AI tools and the checks applied; every generated file was
 reviewed, linted, and tested, and the measured results come from commands in
