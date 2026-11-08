@@ -27,6 +27,10 @@ local-storage/
 data/v1/
 data/teacher/
 
+# Local tooling and runtime state (not part of the submission)
+.tools/
+.runtime/
+
 # Reports / editor noise
 .DS_Store
 *.swp

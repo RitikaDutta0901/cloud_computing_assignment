@@ -32,9 +32,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(ROOT / "worker"))
 
-from storage import read_jsonl  # noqa: E402
+from worker.storage import read_jsonl  # noqa: E402
 
 LOG = logging.getLogger("predict")
 
@@ -49,7 +48,7 @@ def configure_logging() -> None:
 
 def load_rows(input_path: str, limit: int | None, dataset_key: str | None) -> list[dict]:
     if dataset_key:
-        from storage import DATASETS_BUCKET, get_store
+        from worker.storage import DATASETS_BUCKET, get_store
 
         data = get_store().get_bytes(DATASETS_BUCKET, dataset_key)
         if data is None:

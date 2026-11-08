@@ -1,5 +1,7 @@
 .git
 .github
+.runtime
+.tools
 .venv
 models
 local-storage

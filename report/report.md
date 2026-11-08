@@ -3,7 +3,7 @@
 **Name:** Ritika  
 **Roll number:** 230101067  
 **Course:** CS3081 Cloud Computing  
-**Repository:** `https://github.com/<your-username>/230101067_CloudComputing_Assignment`
+**Repository:** `https://github.com/RitikaDutta0901/cloud_computing_assignment`
 
 ## 1. Architecture and design decisions
 
@@ -82,7 +82,20 @@ invariant below is asserted in code:
 input = invalid_json + wrong_keys + bad_intent + bad_slot + duplicates + kept
 ```
 
-`<FILL: Table 1 - Task 1 counts for the smoke run and the full run if available>`
+| Category | Full run |
+|---|---:|
+| Input records | 3,000 |
+| Invalid JSON | 49 |
+| Wrong keys | 4 |
+| Bad intent | 0 |
+| Bad slot | 118 |
+| Duplicates | 47 |
+| Kept | 2,782 |
+
+The invariant holds exactly: `3000 = 49 + 4 + 0 + 118 + 47 + 2782`.
+Coverage verification found 3,000 expected and present IDs, with no missing,
+repeated, or unexpected IDs. The cleaned dataset SHA-256 is
+`7e286136aaaaf4fd15e86ad4fe3c449b304182a69f7dd2664a0d729f13d33734`.
 
 ### 2.4 Sharding rationale
 
@@ -130,7 +143,10 @@ on reproducing the prompt. The model is `EleutherAI/pythia-70m`, loaded in
 float32, trained with AdamW and a linear warm-up schedule on CPU. The target
 is sequence-level: the exact teacher string, not logits.
 
-`<FILL: Table 2 - v1 and v2 loss per epoch, records used, wall time>`
+| Version | Records | Epoch losses | Seed | Wall time |
+|---|---:|---|---:|---:|
+| v1 | 1,500 | 0.360529, 0.087982 | 42 | 403.2 s |
+| v2 | 1,500 | 0.390328, 0.102742, 0.047950 | 43 | 787.8 s |
 
 ### 3.3 Evaluation
 
@@ -139,9 +155,16 @@ Predictions are generated for the teacher (`phi3.5`, same prompt, temperature
 reports are in `results/`. The official `tools/score.py` computes JSON
 validity, intent accuracy, slot accuracies and full-frame accuracy.
 
-`<FILL: Table 3 - teacher/base/v1/v2 scores>`
+| Model | JSON validity | Intent | Date | Time | Place | Full frame |
+|---|---:|---:|---:|---:|---:|---:|
+| Teacher | 99% | 74% | 74% | 87% | 79% | 40% |
+| Untrained Pythia | 0% | 0% | 0% | 0% | 0% | 0% |
+| Student v1 | 99% | 68% | 75% | 89% | 75% | 35% |
+| Student v2 | 100% | 71% | 76% | 89% | 77% | 38% |
 
-`<FILL: short discussion of what changed>`
+Version 2 improves JSON validity to 100%, intent accuracy to 71%, and
+full-frame accuracy to 38%. Its full-frame score is 95% of the teacher's
+40%, while requiring one additional CPU training epoch.
 
 ### 3.4 Sequence-level versus logit-based distillation
 
@@ -181,7 +204,9 @@ from `python:3.12-slim`, installs the CPU-only PyTorch wheel and pinned
 dependencies, and copies no weights. It runs as UID 10001 with a read-only root
 filesystem and a writable `/tmp` emptyDir for the model cache.
 
-`<FILL: local 50-request result: p50/p95, peak RSS, success count, load time>`
+Local 50-request result: p50 **267.48 ms**, p95 **406.08 ms**, throughput
+**3.386 requests/s**, peak RSS **546.8 MiB**, and **50/50 successful requests**
+with a 0% error rate. The run elapsed **14.767 s**.
 
 The 50-request test was run against the local process (no Docker daemon is
 available in this build environment). The container-level 1 CPU / 1 GiB test
@@ -199,7 +224,12 @@ filesystem, and the Secret-backed S3 credentials. `k8s/ingress.yaml` routes
 `/parse`, `/healthz` and `/readyz` through Traefik; `k8s/hpa.yaml` scales 1-2
 replicas at 70% CPU with a 60-second scale-down window.
 
-`<FILL: cluster status. In this environment Docker/k3d are not installed, so the following are NOT MEASURED: HPA 1->2->1, rolling update failure %, rollback header, pod-deletion recovery, three cold starts and median, per-replica request share. The exact commands are in docs/RUNBOOK.md.>`
+The manifests parse successfully and a Docker Engine socket is available, but
+the image build could not pull `python:3.12-slim` because registry DNS/network
+access is unavailable. The following remain NOT MEASURED: HPA 1->2->1,
+rolling-update failure percentage, rollback header, pod-deletion recovery,
+three cold starts and median, and per-replica request share. The exact
+commands are in `docs/RUNBOOK.md`.
 
 Local limitation: the cluster is two k3d nodes on one laptop and shares one
 CPU and one disk. Scaling to two replicas demonstrates the mechanism but does
@@ -269,7 +299,9 @@ checksum, runs `training/predict.py`, then `tools/score.py`) -> `quality-gate`
 through the same gate and is expected to fail; its URL must be inserted here
 after the repository is pushed:
 
-`<FILL: link to the failing quality-gate run>`
+No failing quality-gate URL is available yet because the workflow has not
+completed against a published Release asset. The workflow is configured with
+`workflow_dispatch` input `bad_model=true` for this demonstration.
 
 `AI_USE.md` lists the AI tools and the checks applied; every generated file was
 reviewed, linted, and tested, and the measured results come from commands in
@@ -277,7 +309,9 @@ reviewed, linted, and tested, and the measured results come from commands in
 
 ## 8. Task 7: performance, cost and review
 
-`<FILL: local Locust results: p50, p95, throughput, error rate, total requests; note that this is a local process, not the cluster>`
+The local 50-request benchmark measured p50 **267.48 ms**, p95 **406.08 ms**,
+throughput **3.386 requests/s**, 50 total requests, and 0% errors. This is a
+local-process result, not a Kubernetes/Ingress result.
 
 The cluster measurements (`kubectl top pods`, cold-start median, per-replica
 share) are not available in this build environment; the exact collection
@@ -296,7 +330,10 @@ requests per hour = measured requests/second * 3600
 cost per 1,000 = (7.90 / requests per hour) * 1000
 ```
 
-`<FILL: exact arithmetic with measured throughput and final INR value>`
+The final cluster throughput and therefore the assignment cost per 1,000
+requests cannot be calculated honestly until the Ingress Locust run is
+completed. The local process benchmark is not a substitute for cluster
+throughput.
 
 `scripts/cost.py` performs exactly this calculation from
 `results/loadtest_stats.csv` and `data/rate_card.json`, and writes
@@ -306,18 +343,20 @@ cost per 1,000 = (7.90 / requests per hour) * 1000
 
 SLO: **99.5% of `/parse` requests succeed (HTTP 200) over one load-test
 window**. For the measured window with `N` requests, the error budget is
-`floor(0.005 * N)` failed requests. `<FILL: N, allowed failures, actual failures, budget used/remaining, met/not met>`
+`floor(0.005 * N)` failed requests. For the local benchmark, N=50, the
+allowed failures are 0, actual failures are 0, and the local window meets the
+SLO. This does not certify the Kubernetes load-test window.
 
 ### 8.3 Review
 
 | Component or concern | Evidence (measured) | Limitation found | Improvement proposed |
 |---|---|---|---|
-| Data and storage | `<FILL>` | `<FILL>` | `<FILL>` |
-| Model quality | `<FILL>` | `<FILL>` | `<FILL>` |
-| Latency and throughput | `<FILL>` | `<FILL>` | `<FILL>` |
-| Resource utilisation | `<FILL>` | `<FILL>` | `<FILL>` |
-| Reliability and recovery | `<FILL>` | `<FILL>` | `<FILL>` |
-| Security and cost | `<FILL>` | `<FILL>` | `<FILL>` |
+| Data and storage | 3,000 labels; 2,782 kept; invariant and coverage pass | Local object storage, not SeaweedFS | Run the same pipeline in the cluster |
+| Model quality | v2 JSON validity 100%; full-frame 38% vs teacher 40% | 100-example validation set | Add more validation examples |
+| Latency and throughput | Local p50 267.48 ms; p95 406.08 ms; 3.386 RPS | Not through Ingress | Run Locust against the Service |
+| Resource utilisation | Peak local RSS 546.8 MiB | No cgroup measurement | Capture pod CPU/memory |
+| Reliability and recovery | API 50/50 successful locally | No replica/recovery evidence | Run rollback and pod-deletion tests |
+| Security and cost | Secret scan clean; local SLO window passes | Cluster cost unavailable | Calculate cost from final cluster throughput |
 
 ## 9. Limitations and improvements
 

@@ -6,4 +6,3 @@
  S06  inbound  tcp port 5432  10.20.5.20      -> DENY  (no match (default deny))  OK
 
 Correct: 6 / 6 = 100.0%
-nacl_exit=0

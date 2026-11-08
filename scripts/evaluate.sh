@@ -31,6 +31,9 @@ if [[ "${SKIP_TEACHER:-0}" != "1" ]]; then
   echo "== teacher (phi3.5, temperature 0, seed 42) =="
   "$PY" training/predict.py --kind teacher --output results/pred_teacher.jsonl
   score results/pred_teacher.jsonl results/teacher_validation.json
+  if command -v ollama >/dev/null 2>&1; then
+    ollama stop phi3.5 >/dev/null 2>&1 || true
+  fi
 fi
 
 echo "== untrained EleutherAI/pythia-70m =="

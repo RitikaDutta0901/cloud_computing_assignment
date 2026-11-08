@@ -1,2 +1,2 @@
+$ .venv/bin/ruff check .
 All checks passed!
-ruff_exit=0
