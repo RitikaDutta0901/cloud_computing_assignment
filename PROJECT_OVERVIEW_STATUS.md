@@ -150,7 +150,7 @@ not official marks.
 | Student model training | 95% |
 | Model evaluation | 90% |
 | FastAPI service | 80% |
-| Docker image validation | 30% |
+| Docker image validation | 35% |
 | Kubernetes deployment validation | 25% |
 | Networking and NACL | 100% |
 | CI/CD | 60% |
@@ -171,8 +171,11 @@ the archives and publish the v1 archive as the `final` GitHub Release asset.
 
 ### 2. Validate Docker
 
-The current environment does not have a usable Docker daemon. Required evidence
-still includes:
+An unprivileged Docker Engine socket was available and was tested. The image
+build reached the base-image pull but failed because the daemon's DNS resolver
+could not reach Docker Hub. Restarting the daemon with explicit DNS was not
+possible because rootless mode requires the missing `newuidmap` helper and
+passwordless sudo is unavailable. Required evidence still includes:
 
 - Successful image build.
 - Image size within the assignment limit.

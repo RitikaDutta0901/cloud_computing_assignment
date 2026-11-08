@@ -224,9 +224,11 @@ filesystem, and the Secret-backed S3 credentials. `k8s/ingress.yaml` routes
 `/parse`, `/healthz` and `/readyz` through Traefik; `k8s/hpa.yaml` scales 1-2
 replicas at 70% CPU with a 60-second scale-down window.
 
-The manifests parse successfully and a Docker Engine socket is available, but
-the image build could not pull `python:3.12-slim` because registry DNS/network
-access is unavailable. The following remain NOT MEASURED: HPA 1->2->1,
+The manifests parse successfully. An unprivileged Docker Engine socket was
+available, but the image build could not pull `python:3.12-slim` because the
+daemon's DNS resolver could not reach Docker Hub. Restarting it with explicit
+DNS requires the missing `newuidmap` helper or sudo access. The following
+remain NOT MEASURED: HPA 1->2->1,
 rolling-update failure percentage, rollback header, pod-deletion recovery,
 three cold starts and median, and per-replica request share. The exact
 commands are in `docs/RUNBOOK.md`.
@@ -364,14 +366,14 @@ SLO. This does not certify the Kubernetes load-test window.
 ## 9. Limitations and improvements
 
 The largest limitation of this submission is environmental: the machine used
-to build it has no Docker daemon and no k3d/kubectl, and its free memory is
-about 1.5 GiB while `phi3.5` needs about 2.6 GiB. The code, manifests and
-tests are complete, but the cluster experiments and the full 3,000-command
-teacher run could not be executed here. The report marks those values as not
-measured rather than inventing them. The next step on a Docker host is to run
-`make up`, `make teacher-label`, `make clean`, `make train`, `make train-v2`,
-`make evaluate`, then the Task 4 runbook and `make loadtest`; each command
-writes its evidence to `results/`.
+to build it has an unprivileged Docker daemon whose registry DNS is unusable,
+and rootless restart requires the missing `newuidmap` helper. The bundled
+k3d/kubectl clients are present, but k3d cannot operate without that daemon.
+The code, manifests, tests, full 3,000-command teacher run, training, and
+evaluation are complete. The report marks cluster values as not measured rather
+than inventing them. On a Docker host with working registry access, run
+`make up`, then the Task 4 runbook and `make loadtest`; each command writes its
+evidence to `results/`.
 
 Beyond the environment, a 70M-parameter student will not match a 3.8B teacher;
 the smoke training data is much smaller than the required 1,500 records, so
