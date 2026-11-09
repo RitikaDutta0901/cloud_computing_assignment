@@ -1,11 +1,10 @@
 % Options for packages loaded elsewhere
 \PassOptionsToPackage{unicode}{hyperref}
 \PassOptionsToPackage{hyphens}{url}
+%
 \documentclass[
 ]{article}
-\usepackage{xcolor}
 \usepackage{amsmath,amssymb}
-\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
 \usepackage{iftex}
 \ifPDFTeX
   \usepackage[T1]{fontenc}
@@ -36,26 +35,27 @@
 }{% if KOMA class
   \KOMAoptions{parskip=half}}
 \makeatother
+\usepackage{xcolor}
 \usepackage{longtable,booktabs,array}
-\usepackage{caption}
-\captionsetup[table]{skip=6pt}
-\newcounter{none} % for unnumbered tables
 \usepackage{calc} % for calculating minipage widths
 % Correct order of tables after \paragraph or \subparagraph
 \usepackage{etoolbox}
 \makeatletter
 \patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
 \makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
 \setlength{\emergencystretch}{3em} % prevent overfull lines
 \providecommand{\tightlist}{%
   \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
-\usepackage{bookmark}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\ifLuaTeX
+  \usepackage{selnolig}  % disable illegal ligatures
+\fi
+\IfFileExists{bookmark.sty}{\usepackage{bookmark}}{\usepackage{hyperref}}
 \IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
 \urlstyle{same}
-% fallback for those not using the hyperref driver hyperxmp:
-\makeatletter
-\@ifundefined{xmpquote}{\newcommand{\xmpquote}[1]{#1}}{}
-\makeatother
 \hypersetup{
   hidelinks,
   pdfcreator={LaTeX via pandoc}}
@@ -65,18 +65,20 @@
 
 \begin{document}
 
+\hypertarget{knowledge-distillation-and-deployment-of-a-lightweight-command-parsing-lm-on-a-local-cloud}{%
 \section{Knowledge Distillation and Deployment of a Lightweight
 Command-Parsing LM on a Local
-Cloud}\label{knowledge-distillation-and-deployment-of-a-lightweight-command-parsing-lm-on-a-local-cloud}
+Cloud}\label{knowledge-distillation-and-deployment-of-a-lightweight-command-parsing-lm-on-a-local-cloud}}
 
 \textbf{Name:} Ritika\\
 \textbf{Roll number:} 230101067\\
 \textbf{Course:} CS3081 Cloud Computing\\
 \textbf{Repository:}
-\texttt{https://github.com/\textless{}your-username\textgreater{}/230101067\_CloudComputing\_Assignment}
+\url{https://github.com/RitikaDutta0901/cloud_computing_assignment}
 
+\hypertarget{architecture-and-design-decisions}{%
 \subsection{1. Architecture and design
-decisions}\label{architecture-and-design-decisions}
+decisions}\label{architecture-and-design-decisions}}
 
 The project is a local cloud with four layers. A k3d cluster is created
 from \texttt{cluster/k3d.yaml} (one server, one agent, Traefik and
@@ -105,16 +107,17 @@ image. The workers reach it through \texttt{host.k3d.internal:11434}.
 Every component is stateless except SeaweedFS, so Pod deletion and
 rolling updates are safe.
 
-Version pins live in \texttt{training/config.yaml},
-\texttt{service/requirements.txt}, \texttt{worker/requirements.txt} and
-\texttt{training/requirements.txt}. All cluster configuration is in
-\texttt{k8s/}; the only host-generated state is the git-ignored
-\texttt{.env.local} containing S3 credentials.
+Version pins are recorded in the training configuration and the service,
+worker, and training dependency files. Cluster configuration is in
+\texttt{k8s/}; host-generated S3 credentials are kept in the git-ignored
+\texttt{.env.local}.
 
+\hypertarget{task-1-object-storage-and-parallel-teacher-labelling}{%
 \subsection{2. Task 1: object storage and parallel teacher
-labelling}\label{task-1-object-storage-and-parallel-teacher-labelling}
+labelling}\label{task-1-object-storage-and-parallel-teacher-labelling}}
 
-\subsubsection{2.1 Storage layout}\label{storage-layout}
+\hypertarget{storage-layout}{%
+\subsubsection{2.1 Storage layout}\label{storage-layout}}
 
 SeaweedFS is deployed by \texttt{k8s/seaweedfs.yaml} into namespace
 \texttt{data}. Two buckets are created: \texttt{datasets} and
@@ -124,20 +127,15 @@ SeaweedFS is deployed by \texttt{k8s/seaweedfs.yaml} into namespace
 the eight allowed intents, gives three examples, and is fixed at
 \texttt{temperature=0}, \texttt{seed=42}, \texttt{top\_k=1}.
 
+\hypertarget{sharding-and-resumability}{%
 \subsubsection{2.2 Sharding and
-resumability}\label{sharding-and-resumability}
+resumability}\label{sharding-and-resumability}}
 
-\texttt{worker/worker.py} reads \texttt{SHARD\_INDEX} and
-\texttt{SHARD\_COUNT}, keeps the command on line \texttt{i} when
-\texttt{i\ \%\ SHARD\_COUNT\ ==\ SHARD\_INDEX}, and writes
-\texttt{datasets/teacher/shard-\textless{}index\textgreater{}.jsonl}
-with exactly \texttt{\{"id","text","teacher\_raw"\}}. The Kubernetes Job
-uses \texttt{completionMode:\ Indexed}, \texttt{completions:\ 4},
-\texttt{parallelism:\ 2}; Kubernetes supplies
-\texttt{JOB\_COMPLETION\_INDEX}, which the worker exports as
-\texttt{SHARD\_INDEX}. With four completion indexes, each of the 3,000
-line numbers is selected by exactly one worker, so there are no gaps or
-repeats.
+\texttt{worker/worker.py} assigns each input row to one shard by its
+line-number remainder and writes a JSONL shard containing the id,
+command, and raw teacher reply. The Indexed Kubernetes Job uses four
+completions and parallelism two. Each of the 3,000 input rows belongs to
+exactly one shard, so there are no gaps or repeats.
 
 Resume is built in: before labelling, the worker reads its own existing
 shard object into a set of completed ids and skips them. Progress is
@@ -146,14 +144,14 @@ interrupted multi-hour run loses at most one command. The cleaner also
 refuses to proceed if ids are repeated across shards;
 \texttt{-\/-allow-incomplete} is only for smoke runs.
 
-\subsubsection{2.3 Cleaning rules}\label{cleaning-rules}
+\hypertarget{cleaning-rules}{%
+\subsubsection{2.3 Cleaning rules}\label{cleaning-rules}}
 
 \texttt{worker/clean.py} applies rejection precedence (a)
 -\textgreater{} (b) -\textgreater{} (c) -\textgreater{} (d) and counts
 each record exactly once:
 
 \begin{itemize}
-\tightlist
 \item
   \begin{enumerate}
   \def\labelenumi{(\alph{enumi})}
@@ -162,13 +160,31 @@ each record exactly once:
     \texttt{teacher\_raw} is not valid JSON or is not an object;
   \end{enumerate}
 \item
-  (b) keys are not exactly \texttt{intent}, \texttt{date},
-  \texttt{time}, \texttt{place};
+  \begin{enumerate}
+  \def\labelenumi{(\alph{enumi})}
+  \setcounter{enumi}{1}
+  \tightlist
+  \item
+    keys are not exactly \texttt{intent}, \texttt{date}, \texttt{time},
+    \texttt{place};
+  \end{enumerate}
 \item
-  (c) \texttt{intent} is not one of the eight allowed values;
+  \begin{enumerate}
+  \def\labelenumi{(\alph{enumi})}
+  \setcounter{enumi}{2}
+  \tightlist
+  \item
+    \texttt{intent} is not one of the eight allowed values;
+  \end{enumerate}
 \item
-  (d) a slot is neither null nor a string that appears in the command
-  (case-insensitive, whitespace-normalised);
+  \begin{enumerate}
+  \def\labelenumi{(\alph{enumi})}
+  \setcounter{enumi}{3}
+  \tightlist
+  \item
+    a slot is neither null nor a string that appears in the command
+    (case-insensitive, whitespace-normalised);
+  \end{enumerate}
 \item
   duplicates are removed by normalised command text, keeping the
   smallest id.
@@ -183,9 +199,30 @@ asserted in code:
 input = invalid_json + wrong_keys + bad_intent + bad_slot + duplicates + kept
 \end{verbatim}
 
-\texttt{\textless{}FILL:\ Table\ 1\ -\ Task\ 1\ counts\ for\ the\ smoke\ run\ and\ the\ full\ run\ if\ available\textgreater{}}
+\begin{longtable}[]{@{}lr@{}}
+\toprule\noalign{}
+Category & Full run \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Input records & 3,000 \\
+Invalid JSON & 49 \\
+Wrong keys & 4 \\
+Bad intent & 0 \\
+Bad slot & 118 \\
+Duplicates & 47 \\
+Kept & 2,782 \\
+\end{longtable}
 
-\subsubsection{2.4 Sharding rationale}\label{sharding-rationale}
+The invariant holds exactly:
+\texttt{3000\ =\ 49\ +\ 4\ +\ 0\ +\ 118\ +\ 47\ +\ 2782}. Coverage
+verification found 3,000 expected and present IDs, with no missing,
+repeated, or unexpected IDs. The cleaned dataset SHA-256 is
+\texttt{7e286136aaaaf4fd15e86ad4fe3c449b304182a69f7dd2664a0d729f13d33734}.
+
+\hypertarget{sharding-rationale}{%
+\subsubsection{2.4 Sharding rationale}\label{sharding-rationale}}
 
 Four shards are the smallest count that gives two waves at
 \texttt{parallelism:\ 2}, so the cluster exercises both parallel workers
@@ -202,17 +239,18 @@ for 50 commands per shard (200 total), because a full CPU teacher run of
 3,000 commands takes several hours; the Kubernetes Job is the intended
 full path and is resumable.
 
+\hypertarget{task-2-training-the-student}{%
 \subsection{3. Task 2: training the
-student}\label{task-2-training-the-student}
+student}\label{task-2-training-the-student}}
 
-\subsubsection{3.1 Configuration}\label{configuration}
+\hypertarget{configuration}{%
+\subsubsection{3.1 Configuration}\label{configuration}}
 
 \texttt{training/config.yaml} records the six required items:
 
-{\def\LTcaptype{none} % do not increment counter
 \begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 2\tabcolsep) * \real{0.5000}}@{}}
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedright
 Item
@@ -233,7 +271,6 @@ Library versions & Python 3.12, torch 2.4.1, transformers 4.44.2,
 tokenizers 0.19.1, safetensors 0.4.5, huggingface-hub 0.24.6, numpy
 1.26.4, PyYAML 6.0.2, boto3 1.35.24 \\
 \end{longtable}
-}
 
 \texttt{training/config\_v2.yaml} changes only the seed (43), epochs
 (3), version and loss file. \texttt{make\ train} reads only
@@ -241,8 +278,9 @@ tokenizers 0.19.1, safetensors 0.4.5, huggingface-hub 0.24.6, numpy
 same file and caps the rows. \texttt{training/loss.csv} is written and
 flushed after every epoch.
 
+\hypertarget{example-format-and-loss}{%
 \subsubsection{3.2 Example format and
-loss}\label{example-format-and-loss}
+loss}\label{example-format-and-loss}}
 
 Each record becomes
 \texttt{Command:\ \textless{}text\textgreater{}\textbackslash{}nJSON:\ \textless{}teacher\ reply\textgreater{}}.
@@ -254,9 +292,19 @@ The model is \texttt{EleutherAI/pythia-70m}, loaded in float32, trained
 with AdamW and a linear warm-up schedule on CPU. The target is
 sequence-level: the exact teacher string, not logits.
 
-\texttt{\textless{}FILL:\ Table\ 2\ -\ v1\ and\ v2\ loss\ per\ epoch,\ records\ used,\ wall\ time\textgreater{}}
+\begin{longtable}[]{@{}lrlrr@{}}
+\toprule\noalign{}
+Version & Records & Epoch losses & Seed & Wall time \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+v1 & 1,500 & 0.360529, 0.087982 & 42 & 403.2 s \\
+v2 & 1,500 & 0.390328, 0.102742, 0.047950 & 43 & 787.8 s \\
+\end{longtable}
 
-\subsubsection{3.3 Evaluation}\label{evaluation}
+\hypertarget{evaluation}{%
+\subsubsection{3.3 Evaluation}\label{evaluation}}
 
 Predictions are generated for the teacher (\texttt{phi3.5}, same prompt,
 temperature 0, seed 42), untrained Pythia-70M, and the two students. Raw
@@ -264,12 +312,26 @@ outputs and score reports are in \texttt{results/}. The official
 \texttt{tools/score.py} computes JSON validity, intent accuracy, slot
 accuracies and full-frame accuracy.
 
-\texttt{\textless{}FILL:\ Table\ 3\ -\ teacher/base/v1/v2\ scores\textgreater{}}
+\begin{longtable}[]{@{}lrrrrrr@{}}
+\toprule\noalign{}
+Model & JSON validity & Intent & Date & Time & Place & Full frame \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Teacher & 99\% & 74\% & 74\% & 87\% & 79\% & 40\% \\
+Untrained Pythia & 0\% & 0\% & 0\% & 0\% & 0\% & 0\% \\
+Student v1 & 99\% & 68\% & 75\% & 89\% & 75\% & 35\% \\
+Student v2 & 100\% & 71\% & 76\% & 89\% & 77\% & 38\% \\
+\end{longtable}
 
-\texttt{\textless{}FILL:\ short\ discussion\ of\ what\ changed\textgreater{}}
+Version 2 improves JSON validity to 100\%, intent accuracy to 71\%, and
+full-frame accuracy to 38\%. Its full-frame score is 95\% of the
+teacher's 40\%, while requiring one additional CPU training epoch.
 
+\hypertarget{sequence-level-versus-logit-based-distillation}{%
 \subsubsection{3.4 Sequence-level versus logit-based
-distillation}\label{sequence-level-versus-logit-based-distillation}
+distillation}\label{sequence-level-versus-logit-based-distillation}}
 
 Sequence-level distillation trains the student on the teacher's
 generated sequence, treating it as a hard target. The loss is the
@@ -286,8 +348,9 @@ the teacher's uncertainty and cannot teach the student about near-miss
 alternatives; with only about 1,500 examples, the student can also
 memorise surface forms instead of generalising to unseen commands.
 
+\hypertarget{task-3-inference-service-and-container}{%
 \subsection{4. Task 3: inference service and
-container}\label{task-3-inference-service-and-container}
+container}\label{task-3-inference-service-and-container}}
 
 The service is a FastAPI application on port 8000 with
 \texttt{POST\ /parse}, \texttt{GET\ /healthz} and \texttt{GET\ /readyz}.
@@ -315,18 +378,18 @@ pinned dependencies, and copies no weights. It runs as UID 10001 with a
 read-only root filesystem and a writable \texttt{/tmp} emptyDir for the
 model cache.
 
-\texttt{\textless{}FILL:\ local\ 50-request\ result:\ p50/p95,\ peak\ RSS,\ success\ count,\ load\ time\textgreater{}}
+The Docker image built successfully at \textbf{1.63 GB} and ran in
+Kubernetes with the model fetched from SeaweedFS, not baked into the
+image. A local-process 50-request benchmark measured p50 \textbf{267.48
+ms}, p95 \textbf{406.08 ms}, throughput \textbf{3.386 requests/s}, peak
+RSS \textbf{546.8 MiB}, and \textbf{50/50 successful requests} (0\%
+errors; 14.767 s). The required separate Docker run constrained to 1 CPU
+and 1 GiB was not measured; local RSS is not a substitute for a
+container cgroup measurement. Generation is serialized by a lock.
 
-The 50-request test was run against the local process (no Docker daemon
-is available in this build environment). The container-level 1 CPU / 1
-GiB test is therefore marked as not executed; the commands are
-\texttt{python\ scripts/bench\_local.py\ -\/-url\ ...\ -\/-n\ 50\ -\/-pid\ \textless{}pid\textgreater{}}
-and the Docker invocation in \texttt{README.md}. The service is
-single-worker and generation is serialised by a lock, so peak RSS is
-stable rather than accumulating.
-
+\hypertarget{task-4-kubernetes-deployment-scaling-and-reliability}{%
 \subsection{5. Task 4: Kubernetes deployment, scaling and
-reliability}\label{task-4-kubernetes-deployment-scaling-and-reliability}
+reliability}\label{task-4-kubernetes-deployment-scaling-and-reliability}}
 
 \texttt{k8s/app.yaml} creates a two-replica Deployment in \texttt{app}
 with CPU request 250m/limit 1, memory request 512Mi/limit 1Gi, liveness
@@ -337,7 +400,31 @@ filesystem, and the Secret-backed S3 credentials.
 \texttt{/readyz} through Traefik; \texttt{k8s/hpa.yaml} scales 1-2
 replicas at 70\% CPU with a 60-second scale-down window.
 
-\texttt{\textless{}FILL:\ cluster\ status.\ In\ this\ environment\ Docker/k3d\ are\ not\ installed,\ so\ the\ following\ are\ NOT\ MEASURED:\ HPA\ 1-\textgreater{}2-\textgreater{}1,\ rolling\ update\ failure\ \%,\ rollback\ header,\ pod-deletion\ recovery,\ three\ cold\ starts\ and\ median,\ per-replica\ request\ share.\ The\ exact\ commands\ are\ in\ docs/RUNBOOK.md.\textgreater{}}
+The manifests parse successfully. Live validation was executed on
+2026-11-08 with Docker 29.1.3, a two-node k3d cluster, and SeaweedFS.
+Both Kubernetes nodes became Ready, the v1 model archive was uploaded to
+the live \texttt{models} bucket, and two application replicas became
+Ready on separate nodes. Through a Traefik port-forward,
+\texttt{/healthz}, \texttt{/readyz}, and \texttt{/parse} each returned
+HTTP 200; ten additional inference requests also returned HTTP 200. The
+metrics API was available. A pod sample during the load period reported
+992m CPU and 375 MiB memory; an earlier idle observation was about
+395--398 MiB per pod. HPA scale-up and scale-down events were observed
+against the 70\% CPU target.
+
+The host-side k3d mappings on ports 8080 and 8333 returned empty
+responses, so the live checks used supported
+\texttt{kubectl\ port-forward} paths. The following additional live
+measurements were captured: the v1-only rolling update and rollback
+completed, pod recovery took 12 seconds, three cold starts took 11, 11,
+and 10 seconds, and a short Ingress load test completed 76 requests with
+zero failures (p50 6.0 seconds, p95 6.6 seconds, 1.297 requests/second).
+HPA scale-down to one replica and subsequent scale-up were also
+observed. The short CPU-bound test sent all successful requests to one
+replica, so balanced per-replica request share remains unmeasured. The
+v2 artifact upload remains blocked by SeaweedFS reporting
+\texttt{no\ free\ volumes\ left}; the v1-only rollout validates
+Kubernetes behavior but not a real v1-to-v2 model change.
 
 Local limitation: the cluster is two k3d nodes on one laptop and shares
 one CPU and one disk. Scaling to two replicas demonstrates the mechanism
@@ -349,20 +436,20 @@ traffic. During a rolling update the old pod remains Ready until the new
 pod downloads and loads the model, so the update can take as long as a
 cold start.
 
+\hypertarget{task-5-subnetting-and-nacl}{%
 \subsection{6. Task 5: subnetting and
-NACL}\label{task-5-subnetting-and-nacl}
+NACL}\label{task-5-subnetting-and-nacl}}
 
 Requirements are allocated largest first, each immediately after the
 previous block, with the smallest prefix that fits:
 
-{\def\LTcaptype{none} % do not increment counter
 \begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1667}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1667}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1667}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1667}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1667}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1667}}@{}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 10\tabcolsep) * \real{0.1667}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 10\tabcolsep) * \real{0.1667}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 10\tabcolsep) * \real{0.1667}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 10\tabcolsep) * \real{0.1667}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 10\tabcolsep) * \real{0.1667}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 10\tabcolsep) * \real{0.1667}}@{}}
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedright
 Subnet
@@ -387,7 +474,6 @@ data & 10.20.5.0 & /25 & 10.20.5.1-10.20.5.126 & 10.20.5.127 & 126 \\
 management & 10.20.5.128 & /27 & 10.20.5.129-10.20.5.158 & 10.20.5.159 &
 30 \\
 \end{longtable}
-}
 
 The app subnet needs 1,000 hosts, so /22 (1,022 usable) is the smallest
 fit; public needs 250, so /24 (254); data needs 100, so /25 (126);
@@ -412,8 +498,9 @@ deny for 198.51.100.0/24 must be numbered below the TCP 80/443 allows,
 otherwise those allow rules would match first and the abusive range
 would be allowed.
 
+\hypertarget{task-6-reproducibility-testing-and-cicd}{%
 \subsection{7. Task 6: reproducibility, testing and
-CI/CD}\label{task-6-reproducibility-testing-and-cicd}
+CI/CD}\label{task-6-reproducibility-testing-and-cicd}}
 
 \texttt{make\ up} creates the cluster, secrets, SeaweedFS, buckets,
 images, uploads the model and applies the
@@ -443,26 +530,34 @@ GitHub Release, verifies the checksum, runs
 -\textgreater{} \texttt{quality-gate} (\texttt{-\/-min-validity\ 95}). A
 separate \texttt{secret-scan} job runs gitleaks. A manual
 \texttt{workflow\_dispatch} input \texttt{bad\_model=true} runs the
-untrained Pythia-70M through the same gate and is expected to fail; its
-URL must be inserted here after the repository is pushed:
+untrained Pythia-70M through the same gate and is expected to fail. The
+recorded workflow links are:
 
-\texttt{\textless{}FILL:\ link\ to\ the\ failing\ quality-gate\ run\textgreater{}}
+The successful CI run is
+\texttt{https://github.com/RitikaDutta0901/cloud\_computing\_assignment/actions/runs/42474820456}.
+The expected-failure quality-gate demonstration is
+\texttt{https://github.com/RitikaDutta0901/cloud\_computing\_assignment/actions/runs/42474973794};
+the quality-gate demo job failed as intended while lint, tests, model
+evaluation, and the normal quality gate passed.
 
 \texttt{AI\_USE.md} lists the AI tools and the checks applied; every
 generated file was reviewed, linted, and tested, and the measured
 results come from commands in \texttt{results/}, not from the assistant.
 
+\hypertarget{task-7-performance-cost-and-review}{%
 \subsection{8. Task 7: performance, cost and
-review}\label{task-7-performance-cost-and-review}
+review}\label{task-7-performance-cost-and-review}}
 
-\texttt{\textless{}FILL:\ local\ Locust\ results:\ p50,\ p95,\ throughput,\ error\ rate,\ total\ requests;\ note\ that\ this\ is\ a\ local\ process,\ not\ the\ cluster\textgreater{}}
+The local 50-request benchmark measured p50 \textbf{267.48 ms}, p95
+\textbf{406.08 ms}, throughput \textbf{3.386 requests/s}, 50 total
+requests, and 0\% errors. Ingress Locust results are 76 requests, 0
+failures, p50 \textbf{6.0 s}, p95 \textbf{6.6 s}, and \textbf{1.297
+requests/s}. The cold-start median is \textbf{11 s}. All results are in
+\texttt{results/}; the short CPU-bound run did not demonstrate balanced
+replica use.
 
-The cluster measurements (\texttt{kubectl\ top\ pods}, cold-start
-median, per-replica share) are not available in this build environment;
-the exact collection commands are in \texttt{docs/RUNBOOK.md}. They must
-be filled from a run on a Docker host before submission.
-
-\subsubsection{8.1 Cost}\label{cost}
+\hypertarget{cost}{%
+\subsubsection{8.1 Cost}\label{cost}}
 
 A replica is billed for its CPU limit and memory limit for every hour it
 runs, so with two replicas at 1 vCPU and 1 GiB each:
@@ -474,89 +569,95 @@ requests per hour = measured requests/second * 3600
 cost per 1,000 = (7.90 / requests per hour) * 1000
 \end{verbatim}
 
-\texttt{\textless{}FILL:\ exact\ arithmetic\ with\ measured\ throughput\ and\ final\ INR\ value\textgreater{}}
+Using the short Ingress run (1.297 requests/s, 76 responses, 0 HTTP
+failures), the derived cost is approximately \textbf{1.69 INR per 1,000
+successful HTTP responses}, assuming two replicas billed at their limits
+for the entire hour. This is an estimate from a short run, not a
+sustained capacity or semantic correctness measurement; Locust counted
+HTTP success, not frame accuracy.
 
 \texttt{scripts/cost.py} performs exactly this calculation from
 \texttt{results/loadtest\_stats.csv} and \texttt{data/rate\_card.json},
 and writes \texttt{results/cost.json}.
 
-\subsubsection{8.2 SLO}\label{slo}
+\hypertarget{slo}{%
+\subsubsection{8.2 SLO}\label{slo}}
 
 SLO: \textbf{99.5\% of \texttt{/parse} requests succeed (HTTP 200) over
-one load-test window}. For the measured window with \texttt{N} requests,
-the error budget is \texttt{floor(0.005\ *\ N)} failed requests.
-\texttt{\textless{}FILL:\ N,\ allowed\ failures,\ actual\ failures,\ budget\ used/remaining,\ met/not\ met\textgreater{}}
+one load-test window}. For the cluster window, N=76 and the error budget
+is \texttt{floor(0.005\ *\ 76)\ =\ 0} failures. Actual failures were 0,
+so that measured window met the SLO. This does not certify sustained
+production availability.
 
-\subsubsection{8.3 Review}\label{review}
+\hypertarget{review}{%
+\subsubsection{8.3 Review}\label{review}}
 
-{\def\LTcaptype{none} % do not increment counter
 \begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}@{}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 6\tabcolsep) * \real{0.2500}}@{}}
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedright
-Component or concern
+Task
 \end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-Evidence (measured)
+Measured result
 \end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-Limitation found
+Limitation
 \end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-Improvement proposed
+Improvement
 \end{minipage} \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-Data and storage & \texttt{\textless{}FILL\textgreater{}} &
-\texttt{\textless{}FILL\textgreater{}} &
-\texttt{\textless{}FILL\textgreater{}} \\
-Model quality & \texttt{\textless{}FILL\textgreater{}} &
-\texttt{\textless{}FILL\textgreater{}} &
-\texttt{\textless{}FILL\textgreater{}} \\
-Latency and throughput & \texttt{\textless{}FILL\textgreater{}} &
-\texttt{\textless{}FILL\textgreater{}} &
-\texttt{\textless{}FILL\textgreater{}} \\
-Resource utilisation & \texttt{\textless{}FILL\textgreater{}} &
-\texttt{\textless{}FILL\textgreater{}} &
-\texttt{\textless{}FILL\textgreater{}} \\
-Reliability and recovery & \texttt{\textless{}FILL\textgreater{}} &
-\texttt{\textless{}FILL\textgreater{}} &
-\texttt{\textless{}FILL\textgreater{}} \\
-Security and cost & \texttt{\textless{}FILL\textgreater{}} &
-\texttt{\textless{}FILL\textgreater{}} &
-\texttt{\textless{}FILL\textgreater{}} \\
+1. Storage and labelling & 3,000 labels; 2,782 kept; accounting/coverage
+pass & SeaweedFS exhausted volumes during v2 upload & Restore capacity
+and verify v2 upload \\
+2. Student training & 1,500 examples/version; v2 JSON validity 100\%,
+full-frame 38\% vs teacher 40\% & Only 100 validation examples & Expand
+held-out validation set \\
+3. Service and container & 1.63 GB image; Kubernetes inference and local
+50/50 pass & 1 CPU/1 GiB container benchmark not measured & Repeat
+constrained benchmark with cgroup metrics \\
+4. Kubernetes & Ingress 76 requests/0 failures; recovery 12 s;
+cold-start median 11 s & Short run used one replica; v1-only update &
+Longer test and true v1-to-v2 rollout \\
+5. Networking & NACL simulator 6/6 correct & Simulated packets, not a
+cloud deployment & Validate rules in the target cloud \\
+6. Testing and CI & 49 tests pass; CI and expected quality-gate failure
+recorded & No dedicated multi-node CI runtime & Add a disposable cluster
+integration job \\
+7. Performance and cost & p95 6.6 s; 1.297 RPS; estimated 1.69 INR/1,000
+HTTP 200 & Short-run estimate, not semantic success cost & Measure
+sustained throughput and correct frames \\
 \end{longtable}
-}
 
+\hypertarget{limitations-and-improvements}{%
 \subsection{9. Limitations and
-improvements}\label{limitations-and-improvements}
+improvements}\label{limitations-and-improvements}}
 
-The largest limitation of this submission is environmental: the machine
-used to build it has no Docker daemon and no k3d/kubectl, and its free
-memory is about 1.5 GiB while \texttt{phi3.5} needs about 2.6 GiB. The
-code, manifests and tests are complete, but the cluster experiments and
-the full 3,000-command teacher run could not be executed here. The
-report marks those values as not measured rather than inventing them.
-The next step on a Docker host is to run \texttt{make\ up},
-\texttt{make\ teacher-label}, \texttt{make\ clean},
-\texttt{make\ train}, \texttt{make\ train-v2}, \texttt{make\ evaluate},
-then the Task 4 runbook and \texttt{make\ loadtest}; each command writes
-its evidence to \texttt{results/}.
+The main operational limitation is SeaweedFS volume exhaustion: the
+service reported \texttt{no\ free\ volumes\ left} while uploading the v2
+archive. The live deployment and Kubernetes behavior were therefore
+validated with v1, while a real model artifact switch remains
+unverified. The short Locust run also sent all recorded successful
+requests to one replica, so it does not demonstrate balanced request
+distribution. The image was built and run, but the separate 1 CPU / 1
+GiB Docker benchmark was not measured.
 
 Beyond the environment, a 70M-parameter student will not match a 3.8B
-teacher; the smoke training data is much smaller than the required 1,500
-records, so the local scores are only a pipeline check. The HPA reacts
-to CPU rather than to queue depth, the service serialises generation
-under a lock, and the k3d cluster is two nodes on one machine. Better
-choices would be a queue-depth or latency-based autoscaler, a
-batched/streaming inference server, and a multi-machine cluster to test
-real node failure. On the data side, more teacher examples, stricter
-slot grounding, and a held-out split would reduce overfitting. On the
-security side, the S3 credentials are generated and Secret-backed, the
-image is non-root and read-only, and the NACL is default deny; a network
-policy restricting the app namespace to SeaweedFS and the Ingress would
-add defence in depth.
+teacher; despite full 1,500-record training, the 100-example validation
+set is small and the student's full-frame score remains below the
+teacher. The HPA reacts to CPU rather than to queue depth, the service
+serialises generation under a lock, and the k3d cluster is two nodes on
+one machine. Better choices would be a queue-depth or latency-based
+autoscaler, a batched/streaming inference server, and a multi-machine
+cluster to test real node failure. On the data side, more teacher
+examples, stricter slot grounding, and a held-out split would reduce
+overfitting. On the security side, the S3 credentials are generated and
+Secret-backed, the image is non-root and read-only, and the NACL is
+default deny; a network policy restricting the app namespace to
+SeaweedFS and the Ingress would add defence in depth.
 
 \end{document}

@@ -1,73 +1,54 @@
-# Notes for the handwritten reflection (3 pages)
+# Handwritten Reflection Draft
 
-Use these notes to write the scanned `<roll_number>.pdf` by hand. Do not submit
-this file as the reflection; the assignment requires a handwritten scan.
-Include your name, roll number (230101067) and the GitHub repository link on
-the first page.
+Copy this reflection by hand, then scan it as `230101067.pdf`. Keep the scan
+within three pages. This typed draft is content guidance, not the required
+handwritten scan.
 
-## What I learnt
+**Name:** Ritika<br>
+**Roll number:** 230101067<br>
+**Course:** CS3081 Cloud Computing<br>
+**GitHub repository:** https://github.com/RitikaDutta0901/cloud_computing_assignment
 
-- Sequence-level distillation is much simpler than logit-based distillation:
-  the teacher's text is the label, so the project only needs an HTTP endpoint,
-  not access to the teacher's internal logits or vocabulary.
-- Object storage changes the deployment shape. Because weights live in
-  SeaweedFS and not in the image, a model version is a key (`models/v1` vs
-  `models/v2`), a rolling update is an environment change, and cold start is
-  dominated by download plus load.
-- Readiness is not the same as liveness. `/healthz` keeps the process from
-  being restarted while `/readyz` keeps traffic away until the model is
-  actually usable. This matters because a 70M model still takes time to
-  download and load.
-- A stateless NACL has to describe both directions explicitly. The return
-  traffic rule and the rule number of the deny are not decoration; without
-  them the sample packets are misclassified.
-- Reproducibility is mostly bookkeeping: seeds, pinned versions, checksummed
-  tarballs, one loss row per epoch, and evidence files that can be re-read.
-- Measured evidence is harder than code. The build machine had no Docker, so
-  many Kubernetes checks could not be run. I chose to mark them not measured
-  rather than invent numbers.
+## Reflection
 
-## Challenges and how I handled them
+I built a command-parsing service using knowledge distillation and local-cloud
+tools. A `phi3.5` teacher labelled natural-language commands with JSON. I
+cleaned the labels, trained `EleutherAI/pythia-70m` students, and served a
+student through FastAPI and Kubernetes. This project connected data
+processing, object storage, containerization, networking, testing, and
+deployment.
 
-- The prompt contains literal JSON braces, so `str.format` broke with a
-  `KeyError`. I replaced it with a literal `{command}` substitution and added a
-  regression test.
-- The teacher takes several seconds per command on CPU. A full 3,000-command
-  run is hours, so the worker flushes after every reply and skips ids already
-  present in its own shard. I validated this with a smaller four-shard run.
-- The local machine had about 1.5 GiB free while `phi3.5` needs about 2.6 GiB.
-  I used `num_ctx=1024` and `num_predict=64` for the smoke run and unloaded the
-  teacher before training, rather than risking an OOM kill.
-- Training the whole prompt would waste the 70M model's capacity on copying
-  the command. I masked the prompt tokens so the loss is only on the teacher
-  reply.
-- A rerun could put an old `model.sha256` inside the new tarball; I excluded
-  the checksum file from the archive.
-- The cost formula bills limits even when idle. I had to separate "cost per
-  1,000 requests" from "cost per hour" and show the intermediate arithmetic.
+I learned that sequence-level distillation works when a teacher API returns
+generated text but not token logits: the teacher's text becomes the student's
+training target. I trained v1 and v2 on 1,500 examples each. On 100 evaluation
+examples, v2 achieved 100% JSON validity and 38% full-frame accuracy; the
+teacher scored 40% full-frame accuracy. This taught me that valid JSON does not
+guarantee correct fields, and that evaluation-set size matters.
 
-## What I would do better
+The full labeling run processed 3,000 commands. Cleaning retained 2,782:
+49 invalid JSON, 4 wrong-key records, 118 invalid slots, 47 duplicates, and
+2,782 kept. The accounting invariant and checksums helped verify the results
+instead of trusting a command's exit status.
 
-- Start the full teacher run on the first day, not after the code is finished.
-- Use a machine with Docker and at least 8 GiB free RAM so the k3d, HPA,
-  rolling-update and cold-start evidence can be captured in one session.
-- Collect `kubectl top pods`, the three cold-start times, and per-replica
-  request counts before writing the report, not after.
-- Add a network policy and a queue-depth autoscaler; CPU is a poor proxy for
-  inference load.
-- Train on more data and evaluate with a proper held-out split; the smoke
-  scores are a pipeline check, not a quality claim.
-- Pin transitive dependencies in a lock file for a truly byte-identical image.
+Teacher labeling was slow on CPU, so I used sharding, resumable progress, and
+per-record writes. I also learned why Kubernetes readiness differs from
+liveness: liveness checks whether a process should keep running, while
+readiness prevents traffic before the model is loaded. Live health, readiness,
+and parse requests passed through the Ingress.
 
-## Observations and findings
+SeaweedFS later reported `no free volumes left` while I uploaded v2. I did not
+claim a real model-version switch; instead, I tested rolling update and
+rollback with the working v1 model and documented the blocked upload. The
+Ingress test completed 76 requests with no HTTP failures, but traffic was
+served by one replica only. Recovery took 12 seconds, and cold starts took 11,
+11, and 10 seconds. These are useful measurements, not a sustained capacity
+test.
 
-- The teacher was accurate on the sampled commands (for example, weather and
-  calendar intents with grounded slots); the student is much weaker because it
-  is tiny and saw few examples.
-- Two concurrent teacher requests did not double throughput on this CPU; they
-  contended and were slower per request. Sharding helps throughput only when
-  there are enough cores and memory for parallel model work.
-- The official NACL simulator is a good specification test: it checks the
-  actual packet decisions, not just the JSON shape.
-- The 6/6 NACL result and the 49 passing tests are reproducible locally; the
-  cluster numbers are not, and the report says so.
+The image was about 1.63 GB, the NACL simulator passed 6/6 cases, and 49 tests
+passed. I learned that implementation must be backed by honest measurements:
+a short HTTP-success test does not prove semantic accuracy or balanced load.
+Next, I would restore SeaweedFS capacity, publish and deploy v2, test both
+replicas with a longer load run, and measure Docker at the required CPU and
+memory limits. I would also expand the held-out evaluation set. This project
+taught me to plan for slow workloads, design for recovery, and state clearly
+what each test proves and what remains unknown.

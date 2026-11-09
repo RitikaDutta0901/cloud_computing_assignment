@@ -9,18 +9,28 @@ if ! command -v "$PANDOC" >/dev/null 2>&1 && [[ -x /tmp/pandoc-3.13/bin/pandoc ]
   PANDOC=/tmp/pandoc-3.13/bin/pandoc
 fi
 
-if [[ -f report/report.md ]] && command -v "$PANDOC" >/dev/null 2>&1 && command -v xelatex >/dev/null 2>&1; then
+PANDOC_DATA_ARGS=()
+if [[ -n "${PANDOC_DATA_DIR:-}" ]]; then
+  PANDOC_DATA_ARGS+=(--data-dir "$PANDOC_DATA_DIR")
+fi
+
+if [[ -f report/report.md ]]; then
+  if ! command -v "$PANDOC" >/dev/null 2>&1 || ! command -v xelatex >/dev/null 2>&1; then
+    echo "Pandoc and xelatex are required to build report/report.md." >&2
+    exit 1
+  fi
   "$PANDOC" report/report.md \
+    "${PANDOC_DATA_ARGS[@]}" \
     -o report/report.pdf \
     --pdf-engine=xelatex \
-    -V geometry:margin=1.8cm \
-    -V fontsize=10pt \
+    -V geometry:margin=1.5cm \
+    -V fontsize=9pt \
     -V mainfont="Noto Serif" \
     -V sansfont="Noto Sans" \
     -V colorlinks=true \
     -V linkcolor=blue \
     --highlight-style=tango
-  "$PANDOC" report/report.md -s -t latex -o report/report.tex
+  "$PANDOC" report/report.md "${PANDOC_DATA_ARGS[@]}" -s -t latex -o report/report.tex
   echo "wrote report/report.pdf and report/report.tex"
   exit 0
 fi

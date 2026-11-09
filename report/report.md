@@ -3,7 +3,7 @@
 **Name:** Ritika  
 **Roll number:** 230101067  
 **Course:** CS3081 Cloud Computing  
-**Repository:** `https://github.com/RitikaDutta0901/cloud_computing_assignment`
+**Repository:** <https://github.com/RitikaDutta0901/cloud_computing_assignment>
 
 ## 1. Architecture and design decisions
 
@@ -29,10 +29,9 @@ networking avoids a multi-gigabyte GPU image. The workers reach it through
 `host.k3d.internal:11434`. Every component is stateless except SeaweedFS, so
 Pod deletion and rolling updates are safe.
 
-Version pins live in `training/config.yaml`, `service/requirements.txt`,
-`worker/requirements.txt` and `training/requirements.txt`. All cluster
-configuration is in `k8s/`; the only host-generated state is the git-ignored
-`.env.local` containing S3 credentials.
+Version pins are recorded in the training configuration and the service,
+worker, and training dependency files. Cluster configuration is in `k8s/`;
+host-generated S3 credentials are kept in the git-ignored `.env.local`.
 
 ## 2. Task 1: object storage and parallel teacher labelling
 
@@ -47,14 +46,11 @@ allowed intents, gives three examples, and is fixed at `temperature=0`,
 
 ### 2.2 Sharding and resumability
 
-`worker/worker.py` reads `SHARD_INDEX` and `SHARD_COUNT`, keeps the command on
-line `i` when `i % SHARD_COUNT == SHARD_INDEX`, and writes
-`datasets/teacher/shard-<index>.jsonl` with exactly
-`{"id","text","teacher_raw"}`. The Kubernetes Job uses `completionMode:
-Indexed`, `completions: 4`, `parallelism: 2`; Kubernetes supplies
-`JOB_COMPLETION_INDEX`, which the worker exports as `SHARD_INDEX`. With four
-completion indexes, each of the 3,000 line numbers is selected by exactly one
-worker, so there are no gaps or repeats.
+`worker/worker.py` assigns each input row to one shard by its line-number
+remainder and writes a JSONL shard containing the id, command, and raw teacher
+reply. The Indexed Kubernetes Job uses four completions and parallelism two.
+Each of the 3,000 input rows belongs to exactly one shard, so there are no
+gaps or repeats.
 
 Resume is built in: before labelling, the worker reads its own existing shard
 object into a set of completed ids and skips them. Progress is written after
@@ -204,16 +200,13 @@ from `python:3.12-slim`, installs the CPU-only PyTorch wheel and pinned
 dependencies, and copies no weights. It runs as UID 10001 with a read-only root
 filesystem and a writable `/tmp` emptyDir for the model cache.
 
-Local 50-request result: p50 **267.48 ms**, p95 **406.08 ms**, throughput
+The Docker image built successfully at **1.63 GB** and ran in Kubernetes with
+the model fetched from SeaweedFS, not baked into the image. A local-process
+50-request benchmark measured p50 **267.48 ms**, p95 **406.08 ms**, throughput
 **3.386 requests/s**, peak RSS **546.8 MiB**, and **50/50 successful requests**
-with a 0% error rate. The run elapsed **14.767 s**.
-
-The 50-request test was run against the local process (no Docker daemon is
-available in this build environment). The container-level 1 CPU / 1 GiB test
-is therefore marked as not executed; the commands are
-`python scripts/bench_local.py --url ... --n 50 --pid <pid>` and the Docker
-invocation in `README.md`. The service is single-worker and generation is
-serialised by a lock, so peak RSS is stable rather than accumulating.
+(0% errors; 14.767 s). The required separate Docker run constrained to 1 CPU
+and 1 GiB was not measured; local RSS is not a substitute for a container
+cgroup measurement. Generation is serialized by a lock.
 
 ## 5. Task 4: Kubernetes deployment, scaling and reliability
 
@@ -230,17 +223,19 @@ nodes became Ready, the v1 model archive was uploaded to the live `models`
 bucket, and two application replicas became Ready on separate nodes. Through
 a Traefik port-forward, `/healthz`, `/readyz`, and `/parse` each returned
 HTTP 200; ten additional inference requests also returned HTTP 200. The
-metrics API was available, reporting approximately 395--398 MiB per
-application pod and 38% average CPU against the HPA's 70% target with two
-desired replicas.
+metrics API was available. A pod sample during the load period reported
+992m CPU and 375 MiB memory; an earlier idle observation was about
+395--398 MiB per pod. HPA scale-up and scale-down events were observed against
+the 70% CPU target.
 
 The host-side k3d mappings on ports 8080 and 8333 returned empty responses, so
 the live checks used supported `kubectl port-forward` paths. The following
 additional live measurements were captured: the v1-only rolling update and
 rollback completed, pod recovery took 12 seconds, three cold starts took 11,
 11, and 10 seconds, and a short Ingress load test completed 76 requests with
-zero failures (p95 7.2 seconds). HPA scale-down to one replica and subsequent
-scale-up were also observed. The short CPU-bound test sent all successful
+zero failures (p50 6.0 seconds, p95 6.6 seconds, 1.297 requests/second).
+HPA scale-down to one replica and subsequent scale-up were also observed. The
+short CPU-bound test sent all successful
 requests to one replica, so balanced per-replica request share remains
 unmeasured. The v2 artifact upload remains blocked by SeaweedFS reporting
 `no free volumes left`; the v1-only rollout validates Kubernetes behavior but
@@ -311,8 +306,8 @@ The CI workflow in `.github/workflows/ci.yml` runs in the required order:
 checksum, runs `training/predict.py`, then `tools/score.py`) -> `quality-gate`
 (`--min-validity 95`). A separate `secret-scan` job runs gitleaks. A manual
 `workflow_dispatch` input `bad_model=true` runs the untrained Pythia-70M
-through the same gate and is expected to fail; its URL must be inserted here
-after the repository is pushed:
+through the same gate and is expected to fail. The recorded workflow links
+are:
 
 The successful CI run is
 `https://github.com/RitikaDutta0901/cloud_computing_assignment/actions/runs/42474820456`.
@@ -328,13 +323,10 @@ reviewed, linted, and tested, and the measured results come from commands in
 ## 8. Task 7: performance, cost and review
 
 The local 50-request benchmark measured p50 **267.48 ms**, p95 **406.08 ms**,
-throughput **3.386 requests/s**, 50 total requests, and 0% errors. This is a
-local-process result, not a Kubernetes/Ingress result.
-
-The cluster measurements (`kubectl top pods`, cold-start median, per-replica
-share) are not available in this build environment; the exact collection
-commands are in `docs/RUNBOOK.md`. They must be filled from a run on a Docker
-host before submission.
+throughput **3.386 requests/s**, 50 total requests, and 0% errors. Ingress
+Locust results are 76 requests, 0 failures, p50 **6.0 s**, p95 **6.6 s**, and
+**1.297 requests/s**. The cold-start median is **11 s**. All results are in
+`results/`; the short CPU-bound run did not demonstrate balanced replica use.
 
 ### 8.1 Cost
 
@@ -348,10 +340,11 @@ requests per hour = measured requests/second * 3600
 cost per 1,000 = (7.90 / requests per hour) * 1000
 ```
 
-The final cluster throughput and therefore the assignment cost per 1,000
-requests cannot be calculated honestly until the Ingress Locust run is
-completed. The local process benchmark is not a substitute for cluster
-throughput.
+Using the short Ingress run (1.297 requests/s, 76 responses, 0 HTTP failures),
+the derived cost is approximately **1.69 INR per 1,000 successful HTTP
+responses**, assuming two replicas billed at their limits for the entire hour.
+This is an estimate from a short run, not a sustained capacity or semantic
+correctness measurement; Locust counted HTTP success, not frame accuracy.
 
 `scripts/cost.py` performs exactly this calculation from
 `results/loadtest_stats.csv` and `data/rate_card.json`, and writes
@@ -360,37 +353,35 @@ throughput.
 ### 8.2 SLO
 
 SLO: **99.5% of `/parse` requests succeed (HTTP 200) over one load-test
-window**. For the measured window with `N` requests, the error budget is
-`floor(0.005 * N)` failed requests. For the local benchmark, N=50, the
-allowed failures are 0, actual failures are 0, and the local window meets the
-SLO. This does not certify the Kubernetes load-test window.
+window**. For the cluster window, N=76 and the error budget is
+`floor(0.005 * 76) = 0` failures. Actual failures were 0, so that measured
+window met the SLO. This does not certify sustained production availability.
 
 ### 8.3 Review
 
-| Component or concern | Evidence (measured) | Limitation found | Improvement proposed |
+| Task | Measured result | Limitation | Improvement |
 |---|---|---|---|
-| Data and storage | 3,000 labels; 2,782 kept; invariant and coverage pass | Local object storage, not SeaweedFS | Run the same pipeline in the cluster |
-| Model quality | v2 JSON validity 100%; full-frame 38% vs teacher 40% | 100-example validation set | Add more validation examples |
-| Latency and throughput | Local p50 267.48 ms; p95 406.08 ms; 3.386 RPS | Not through Ingress | Run Locust against the Service |
-| Resource utilisation | Peak local RSS 546.8 MiB | No cgroup measurement | Capture pod CPU/memory |
-| Reliability and recovery | API 50/50 successful locally | No replica/recovery evidence | Run rollback and pod-deletion tests |
-| Security and cost | Secret scan clean; local SLO window passes | Cluster cost unavailable | Calculate cost from final cluster throughput |
+| 1. Storage and labelling | 3,000 labels; 2,782 kept; accounting/coverage pass | SeaweedFS exhausted volumes during v2 upload | Restore capacity and verify v2 upload |
+| 2. Student training | 1,500 examples/version; v2 JSON validity 100%, full-frame 38% vs teacher 40% | Only 100 validation examples | Expand held-out validation set |
+| 3. Service and container | 1.63 GB image; Kubernetes inference and local 50/50 pass | 1 CPU/1 GiB container benchmark not measured | Repeat constrained benchmark with cgroup metrics |
+| 4. Kubernetes | Ingress 76 requests/0 failures; recovery 12 s; cold-start median 11 s | Short run used one replica; v1-only update | Longer test and true v1-to-v2 rollout |
+| 5. Networking | NACL simulator 6/6 correct | Simulated packets, not a cloud deployment | Validate rules in the target cloud |
+| 6. Testing and CI | 49 tests pass; CI and expected quality-gate failure recorded | No dedicated multi-node CI runtime | Add a disposable cluster integration job |
+| 7. Performance and cost | p95 6.6 s; 1.297 RPS; estimated 1.69 INR/1,000 HTTP 200 | Short-run estimate, not semantic success cost | Measure sustained throughput and correct frames |
 
 ## 9. Limitations and improvements
 
-The largest limitation of this submission is environmental: the machine used
-to build it has an unprivileged Docker daemon whose registry DNS is unusable,
-and rootless restart requires the missing `newuidmap` helper. The bundled
-k3d/kubectl clients are present, but k3d cannot operate without that daemon.
-The code, manifests, tests, full 3,000-command teacher run, training, and
-evaluation are complete. The report marks cluster values as not measured rather
-than inventing them. On a Docker host with working registry access, run
-`make up`, then the Task 4 runbook and `make loadtest`; each command writes its
-evidence to `results/`.
+The main operational limitation is SeaweedFS volume exhaustion: the service
+reported `no free volumes left` while uploading the v2 archive. The live
+deployment and Kubernetes behavior were therefore validated with v1, while a
+real model artifact switch remains unverified. The short Locust run also sent
+all recorded successful requests to one replica, so it does not demonstrate
+balanced request distribution. The image was built and run, but the separate
+1 CPU / 1 GiB Docker benchmark was not measured.
 
 Beyond the environment, a 70M-parameter student will not match a 3.8B teacher;
-the smoke training data is much smaller than the required 1,500 records, so
-the local scores are only a pipeline check. The HPA reacts to CPU rather than
+despite full 1,500-record training, the 100-example validation set is small and
+the student's full-frame score remains below the teacher. The HPA reacts to CPU rather than
 to queue depth, the service serialises generation under a lock, and the k3d
 cluster is two nodes on one machine. Better choices would be a queue-depth or
 latency-based autoscaler, a batched/streaming inference server, and a

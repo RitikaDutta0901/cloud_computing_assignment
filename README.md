@@ -1,5 +1,16 @@
 # Knowledge Distillation and Deployment of a Lightweight Command-Parsing LM
 
+**GitHub repository:** [RitikaDutta0901/cloud_computing_assignment](https://github.com/RitikaDutta0901/cloud_computing_assignment)<br>
+**Course:** CS3081 Cloud Computing<br>
+**Student:** Ritika — **Roll number:** 230101067
+
+Submission files are prepared separately: the project report is
+[`report/report.pdf`](report/report.pdf), and the reflection must be handwritten
+and scanned by the student as `230101067.pdf` (maximum three pages). The final
+upload package should be named `230101067.zip`; do not include model weights
+from the ignored `models/` directory because the model package is delivered by
+the GitHub Release.
+
 A local-cloud implementation of the CS3081 mini project. A `phi3.5` teacher
 labels commands, the replies distil into `EleutherAI/pythia-70m`, and the
 student is served by FastAPI on a k3d Kubernetes cluster with SeaweedFS object
@@ -293,26 +304,31 @@ load-test window. Cluster resource usage is captured with `kubectl top pods`.
 
 ## Evidence and status
 
-- `results/` contains commands and outputs that were actually produced.
+- `results/` contains commands and outputs that were actually produced,
+  including teacher-labeling, training/evaluation, CI, and live Kubernetes
+  evidence.
 - `report/final_audit.md` maps every marking criterion to its implementation
   and status.
-- The development environment used for this build had no Docker daemon, so the
-  k3d cluster and full 3,000-command teacher run could not be executed here.
-  Those items are marked **not measured** in the audit and report; the code and
-  manifests are complete and the local tests pass. Do not treat an unmeasured
-  item as evidence.
+- The live k3d deployment passed health/readiness/parse checks through a
+  Traefik port-forward. The recorded Ingress load test completed 76 requests
+  with zero HTTP failures; three cold starts took 11, 11, and 10 seconds, and
+  pod recovery took 12 seconds. The short CPU-bound load test did not establish
+  balanced per-replica traffic.
+- SeaweedFS refused the v2 archive upload with `no free volumes left`.
+  The published `final` release contains the v1 model archive and checksum;
+  the archive includes its tokenizer, configuration, training metadata, and
+  checksums. The v1-only rolling update verifies Kubernetes behavior, not a
+  v1-to-v2 artifact switch.
+
+Build the project report with `make report`; Pandoc and XeLaTeX must be
+installed. The generated `report/report.pdf` is checked to remain within the
+eight-page limit.
 
 ## Release and final tag
 
-Only after all tasks have been executed and the audit is complete:
-
-```bash
-git add -A
-git commit -m "final submission"
-git tag final
-git push origin main --tags
-gh release create final models/v1/model.tar.gz models/v1/model.sha256
-```
-
-Do not tag `final` before the Release asset exists and the CI quality gate has
-passed (or the documented failing-demo run has been recorded).
+The repository's `final` GitHub Release contains `model.tar.gz` and
+`model.sha256`. The model archive includes the tokenizer and version/training
+metadata. The report documents the remaining v2 object-storage limitation.
+Before submission, verify the `final` tag points to the exact complete source
+commit and retain the existing Release assets. Do not add model weights to Git;
+publish them as GitHub Release assets.

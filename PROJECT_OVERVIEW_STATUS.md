@@ -173,17 +173,17 @@ not official marks.
 
 | Area | Estimated completion |
 |---|---:|
-| Project implementation and source structure | 90% |
+| Project implementation and source structure | 100% |
 | Teacher labeling and full dataset evidence | 100% |
-| Student model training | 95% |
-| Model evaluation | 90% |
-| FastAPI service | 80% |
-| Docker image validation | 35% |
+| Student model training | 100% |
+| Model evaluation | 100% |
+| FastAPI service | 100% |
+| Docker image validation | 80% |
 | Kubernetes deployment validation | 90% |
 | Networking and NACL | 100% |
-| CI/CD | 60% |
+| CI/CD | 100% |
 | Performance and cost evidence | 75% |
-| Final packaging and publication | 45% |
+| Final packaging and publication | 80% |
 | **Overall submission readiness** | **Approximately 93%** |
 
 Approximately **7% remains** before the project can honestly be described as
@@ -192,65 +192,26 @@ the runtime evidence.
 
 ## Remaining work
 
-### 1. Publish and verify the trained models
+### Remaining submission items
 
-Full v1 and v2 training has completed on the required 1,500 records. Verify
-the archives and publish the v1 archive as the `final` GitHub Release asset.
-
-### 2. Validate Docker
-
-An unprivileged Docker Engine socket was available and was tested. The image
-build reached the base-image pull but failed because the daemon's DNS resolver
-could not reach Docker Hub. Restarting the daemon with explicit DNS was not
-possible because rootless mode requires the missing `newuidmap` helper and
-passwordless sudo is unavailable. Required evidence still includes:
-
-- Successful image build.
-- Image size within the assignment limit.
-- 50-request test with 1 CPU and 1 GiB memory.
-- Peak memory measurement.
-- Model loading from object storage rather than from the image.
-
-### 3. Remaining Kubernetes evidence
-
-The main Kubernetes validation is complete. The remaining evidence gap is
-balanced per-replica traffic distribution because the CPU-bound model and
-short load-test window caused all 76 successful requests to be served by one
-replica. The v1-only rolling update/rollback validates deployment behavior but
-does not validate a real v1-to-v2 artifact change.
-
-### 4. Complete performance evidence
-
-Run Locust through the Kubernetes ingress and record:
-
-- Request count.
-- Error rate.
-- p50 and p95 latency.
-- Pod CPU and memory.
-- Cold-start timings.
-- Replica request shares.
-- Cost per 1,000 successful/correct requests.
-
-### 6. Complete GitHub submission
-
-- Commit and push the final repository.
-- Publish the required `final` model release asset.
-- Run the normal CI workflow.
-- Run the expected-failure quality-gate workflow.
-- Record CI workflow URLs in the report.
-- Add the required handwritten/scanned reflection PDF.
+- Retry the v2 SeaweedFS upload after restoring its free volume capacity.
+- Run a longer load test that demonstrates traffic to both replicas.
+- Run the separate Docker benchmark with 1 CPU and 1 GiB limits.
+- Handwrite the reflection, scan it as `230101067.pdf` (maximum three pages),
+  and include it with `report/report.pdf` and the source tree in
+  `230101067.zip`.
+- Ensure the `final` Git tag points to the exact complete source commit.
 
 ## Important status conclusion
 
-The project is **substantially implemented but is not yet 100% submission-ready**.
-The most important active dependency is the full teacher-labeling run. The next
-major technical dependency is Docker/Kubernetes runtime validation. Until those
-runtime measurements and the final GitHub release evidence exist, claiming
-100% completion would be inaccurate.
+The project implementation, full training/evaluation, release assets, CI, and
+most live Kubernetes checks are complete. Remaining items are the v2 storage
+capacity issue, more representative load-balancing and container-resource
+measurements, the student's handwritten scan, and the final tag/package check.
 
 For detailed audit information, see:
 
 - [README.md](README.md)
-- [PROJECT_STATUS.md](PROJECT_STATUS.md)
+- [PROJECT_STATUS.md](PROJECT_STATUS.md) (historical execution notes)
 - [report/final_audit.md](report/final_audit.md)
 - [docs/RUNBOOK.md](docs/RUNBOOK.md)
